@@ -69,10 +69,11 @@ function shareAllUi(state, bus) {
   totals += ` | Down ${formatSpeed(totalStats.down)}, Up ${formatSpeed(totalStats.up)}`
   totals += '\n\n'
 
-  state.debug = state.debug || []
-  state.debug.forEach(function(msg) {
-    debug += chalk.yellow(msg) + '\n'
-  })
+  // debug breaks formatting, disabled for now.
+  // state.debug = state.debug || []
+  // state.debug.forEach(function(msg) {
+  //   debug += chalk.yellow(msg) + '\n'
+  // })
 
   return errors + totals + status + debug
 }

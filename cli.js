@@ -22,6 +22,9 @@ var defaultOpts = {
   import: false
 }
 
+var ui = require('./ui')
+var neat = neatlog(ui, {})
+
 if (args.help) {
   var help = `Usage: dat-share-all [--watch] [--import] [--dir=<dir>]
 
@@ -36,24 +39,21 @@ Options:
   process.exit(0)
 }
 
-if (args.watch) {
-  defaultOpts.watch = true
-  setInterval(function() {
-    neat.use(watch)
-  }, 5000)
-}
 if (args.import) {
   defaultOpts.import = true
 }
-
-var ui = require('./ui')
-var neat = neatlog(ui, {})
 
 neat.use(init)
 neat.use(archive)
 neat.use(wait)
 neat.render()
 
+if (args.watch) {
+  defaultOpts.watch = true
+  setInterval(function() {
+    neat.use(watch)
+  }, 5000)
+}
 
 function init(state, bus) {
   state.dats = {}
