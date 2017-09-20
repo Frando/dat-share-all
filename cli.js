@@ -22,8 +22,15 @@ var defaultOpts = {
   import: false
 }
 
-var ui = require('./ui')
-var neat = neatlog(ui, {})
+if (args.curses) {
+  var ui = require('./ui-blessed')
+  var neat = neatlog(ui.ui, {})
+  neat.use(ui.handler)
+}
+else {
+  var ui = require('./ui')
+  var neat = neatlog(ui, {})
+}
 
 if (args.help) {
   var help = `Usage: dat-share-all [--watch] [--import] [--dir=<dir>]
@@ -34,6 +41,7 @@ Options:
     --watch     Watch for new dats being added and share them(default: false).
     --import    Watch for file changes in dats and import them (default: false).
     --dir=<dir> Set the dir from which to look for dats (default: current dir).
+    --curses    Curses-style UI (WIP)
 `
   console.log(help)
   process.exit(0)

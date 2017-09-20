@@ -12,11 +12,13 @@
   "author": "Franz Heinzmann",
   "license": "MIT",
   "dependencies": {
+    "blessed": "Frando/blessed#fixes",
     "chalk": "^2.1.0",
     "chokidar": "^1.7.0",
     "dat-encoding": "^4.0.2",
     "dat-node": "^3.5.3",
     "debug": "^3.0.1",
+    "deep-equal": "^1.0.1",
     "glob": "^7.1.2",
     "minimist": "^1.2.0",
     "neat-log": "^1.1.1",
