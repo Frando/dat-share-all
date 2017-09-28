@@ -1,15 +1,11 @@
-var blessed   = require('blessed')
-var chalk     = require('chalk')
-var pretty    = require('prettier-bytes')
-var stringKey = require('dat-encoding').toStr
-var deepequal = require('deep-equal')
+var blessed    = require('blessed')
+var pretty     = require('prettier-bytes')
+var stringKey  = require('dat-encoding').toStr
+var deepequal  = require('deep-equal')
+var pad        = require('./util').pad
+var formatPath = require('./util').formatPath
 
-module.exports =  {ui: blessedUI, handler: blessedHandler}
-
-function blessedHandler(state, bus) {
-  bus.once('initBlessedUi', initBlessedUi)
-  bus.emit('initBlessedUi', state, bus)
-}
+module.exports = blessedUI
 
 function initBlessedUi(state, bus) {
   var screen = blessed.screen({
@@ -17,15 +13,21 @@ function initBlessedUi(state, bus) {
     warnings: true,
     useBCE: true,
 
+    tags: true,
     mouse: false,
     log: './log',
     debug: true
-
   });
 
   screen.key(['q','C-q'], function() {
     return process.exit(0);
   });
+
+  screen.debugLog.height = 10;
+  screen.debugLog.width = 50;
+  screen.key('f10', screen.debugLog.toggle);
+
+  var defaultBg = '#282828'
 
   var prompt = blessed.prompt({
     parent: screen,
@@ -37,12 +39,7 @@ function initBlessedUi(state, bus) {
     keys: true,
     vi: true,
     tags: true,
-    // border:
     hidden: true,
-    // style: {
-    //   fg: 'blue',
-    //   bg: 'yellow'
-    // }
   });
 
   var header = blessed.box({
@@ -50,23 +47,62 @@ function initBlessedUi(state, bus) {
     top: 0,
     left: 0,
     width: '100%',
+    tags: true,
     height: 1,
     style: {
-      bg: '#111',
-      fg: '#ffff00'
+      bg: defaultBg,
+      fg: 'cyan'
     },
     content: ''
   })
 
-// Create a table
   var table = blessed.listtable({
     parent: screen,
     name:'table',
     left: 0,
     top: 1,
-    bottom: 5,
+    bottom: 4,
     width: '100%',
+    tags: true,
     data: [],
+
+    align: 'left',
+    style: {
+      bg: defaultBg,
+      fg: 'white',
+      header: {
+        bg: 'green',
+        fg: defaultBg
+      },
+      cell: {
+        bg: defaultBg,
+        fg: 'white',
+        selected: {
+          bg: '#00ffff',
+          fg: defaultBg
+        },
+      },
+    },
+    noCellBorders: true,
+    invertSelected: false,
+
+    keys: true,
+    vi: true,
+    interactive: true,
+    scrollable: true,
+    alwaysScroll: true,
+    mouse: true,
+
+    scrollbar: {
+      ch: ' ',
+      track: {
+        bg: '#444',
+        fg: '#fff'
+      },
+      style: {
+        inverse: true
+      }
+    },
 
     search: function(callback) {
       prompt.setFront()
@@ -75,64 +111,18 @@ function initBlessedUi(state, bus) {
         return callback(null, value);
       });
     },
-
-    align: 'left',
-    style: {
-      bg: '#111111',
-      fg: 'white',
-      header: {
-        bg: 'green',
-        fg: '#111111'
-      },
-      cell: {
-        bg: '#111111',
-        fg: 'white',
-        selected: {
-          bg: '#00ffff',
-          fg: '#111111'
-        },
-      },
-      scrollbar: {
-        bg: 'blue',
-        fg: 'yellow'
-      }
-    },
-
-    noCellBorders: true,
-    invertSelected: false,
-    // border: 'line',
-
-    keys: true,
-    vi: true,
-    interactive: true,
-    scrollable: true,
-    alwaysScroll: true,
-    // mouse: true
-
-    // scrollbar: {
-    //   style: {
-    //     bg: 'yellow'
-    //   }
-    // }
-
-
   });
 
-
-  var border1 = blessed.box({
+  var detailsTitle = blessed.box({
     parent: screen,
     bottom: 3,
     left: 0,
     width: '100%',
     height: 1,
-    // border: {
-    //   type: 'bg',
-    //   fg: '#777',
-    //   ch: '-'
-    // },
+    tags: true,
     style: {
-      bg: 'green',
-      fg: '#111'
+      bg: '#333333',
+      fg: 'yellow'
     },
     content: ''
   })
@@ -141,17 +131,29 @@ function initBlessedUi(state, bus) {
     parent: screen,
     bottom: 0,
     left: 0,
-    width: '100%',
+    right: 0,
     height: 3 ,
     align: 'left',
     content: '',
-    // border: {
-    //   type: 'line',
-    //   fg: 'cyan'
-    // },
+    tags: true,
     style: {
-      bg: '#111',
-      fg: '#ffff00'
+      bg: defaultBg,
+      fg: '#ffffff'
+    }
+  });
+
+  var details2 = blessed.box({
+    parent: screen,
+    bottom: 0,
+    right: 0,
+    width: 20,
+    height: 2 ,
+    align: 'left',
+    tags: true,
+    content: '',
+    style: {
+      bg: defaultBg,
+      fg: '#ffffff'
     }
   });
 
@@ -166,73 +168,134 @@ function initBlessedUi(state, bus) {
   }
 
   table.on('selectrow', function(item, selected) {
-    var content = ''
     if (state.tableindex[selected]) {
+      var content, title, files, version
       var key = state.tableindex[selected]
-      content += state.dats[key].name
-      if (state.dats[key].title) {
-        content += chalk.bold.yellow(' (' + state.dats[key].title + ')')
+      var dat = state.dats[key]
+      var stats = dat.stats
+      var fileStats = stats.get()
+
+      content  = `  Link: {blue-fg}dat://${stringKey(dat.key)}{/}\n`
+      content += `  Path: {blue-fg}${formatPath(dat.path, state.basepath, 70)}{/}`
+
+      title = '{yellow-fg}dat.name'
+      if (dat.title) {
+        title += ' {bold}(' + dat.title + ')'
       }
-      content += '\n'
-      content += 'Link: ' + chalk.blue('dat://' + stringKey(state.dats[key].key)) + '\n'
-      content += 'Path: ' + chalk.blue(state.dats[key].path)
+      title += '{/}'
+
+      files = `${fileStats.files} files, ${pretty(fileStats.byteLength)}\n`
+      version = `Version: ${fileStats.version}`
+      if (dat.updated) {
+        version = '{magenta-fg}' + version + '{/}'
+      }
+
+      detailsTitle.setContent('> ' + title)
+      details.setContent(content)
+      details2.setContent(files + version)
+      screen.render()
     }
-    details.setContent(content)
-    screen.render()
   })
 
-  screen.log('start')
-
-
+  // screen.log('start')
 }
 
-
-
 function blessedUI(state, bus) {
+  if (!state.ui) {
+    initBlessedUi(state, bus)
+  }
+
   var data = []
   var tableindex = []
   data.push([
-    'name',
-    'key',
-    'peers',
-    'down',
-    'up'
+    'TITLE',
+    'DIR',
+    'KEY',
+    'PEERS',
+    '  DOWN',
+    '    UP',
+    'W?'
   ])
   tableindex.push(false)
-  var totalStats = {up: 0, down: 0, conns: 0}
+
+  // Save previous selected item.
+  var selected = 0
+  if (state.tableindex && state.tableindex[state.ui.table.selected]) {
+    selected = state.tableindex[state.ui.table.selected]
+  }
+
+  // Update table data.
+  var totalStats = {up: 0, down: 0, conns: 0, dats: 0}
   for (var key in state.dats) {
     if (!state.dats.hasOwnProperty(key)) continue;
     var dat = state.dats[key]
     var stats = dat.stats
     totalStats = {
-      up: totalStats.up + stats.network.downloadSpeed,
-      down: totalStats.down + stats.network.uploadSpeed,
-      conns: totalStats.conns + stats.peers.total
+      up: totalStats.up + stats.network.uploadSpeed,
+      down: totalStats.down + stats.network.downloadSpeed,
+      conns: totalStats.conns + stats.peers.total,
+      dats: totalStats.dats + 1
     }
+    var writable = dat.dat.writable ? '*' : ''
+    if (writable && dat.updated) {
+      writable = '{magenta-fg}' + writable + '{/}'
+    }
+    var title = ''
+    if (dat.title) {
+      title = dat.title
+    }
+    var down = pad(pretty(stats.network.downloadSpeed), 6, 'left');
+    var up = pad(pretty(stats.network.uploadSpeed), 6, 'left');
+
+    if (stats.network.downloadSpeed) {
+      down = '{yellow-fg}' + down + '{/}'
+    }
+    if (stats.network.uploadSpeed) {
+      up = '{yellow-fg}' + up + '{/}'
+    }
+
     var row = [
-      dat.name,
+      title.length > 20 ? title.substr(0, 20) + '..' : title,
+      formatPath(dat.path, state.basepath, 20),
       formatKey(dat.dat.key),
       stats.peers.total.toString(),
-      pretty(stats.network.downloadSpeed),
-      pretty(stats.network.uploadSpeed)
+      down,
+      up,
+      writable
     ]
     data.push(row)
     tableindex.push(key)
   }
 
-  var header = ''
-  header += 'Connections: ' + totalStats.conns.toString() + '  |  ' + 'Upload: ' + pretty(totalStats.up) + '  |  ' + 'Download: ' + pretty(totalStats.down)
-
+  // Rerender only if data changed.
   if (state.ui && (!state.tabledata || !deepequal(state.tabledata, data))) {
+    // Update table data.
     state.ui.table.setData(data)
-    state.ui.header.setContent(header)
-    state.ui.table.scrollTo(0)
-    // table.focus()
-    state.ui.screen.render()
-  }
-  state.tabledata = data
-  state.tableindex = tableindex
 
+    // Update header.
+    var header = ''
+    header += 'Dats: {bold}' + totalStats.dats + '{/}   '
+    header += 'Connections: {bold}' + totalStats.conns.toString() + '{/}   '
+    header += 'Download: {bold}' + pretty(totalStats.down) + '{/}   '
+    header += 'Upload: {bold}' + pretty(totalStats.up) + '{/}'
+    state.ui.header.setContent(header)
+
+    // Store scrollpos.
+    var scrollpos = state.ui.table.getScroll()
+
+    // Rerender.
+    state.ui.table.focus()
+    state.ui.screen.render()
+
+    // Restore scroll and select.
+    if (selected && tableindex.indexOf(selected) !== 0) {
+      state.ui.table.select(tableindex.indexOf(selected))
+    }
+    state.ui.table.scrollTo(scrollpos)
+
+    state.tabledata = data
+    state.tableindex = tableindex
+  }
 }
 
 function formatKey(key) {

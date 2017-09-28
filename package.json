@@ -1,6 +1,6 @@
 {
   "name": "dat-share-all",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Share all dats in a folder",
   "main": "index.js",
   "scripts": {
@@ -12,16 +12,16 @@
   "author": "Franz Heinzmann",
   "license": "MIT",
   "dependencies": {
-    "blessed": "Frando/blessed#fixes",
+    "blessed": "github:Frando/blessed#fixes",
     "chalk": "^2.1.0",
     "chokidar": "^1.7.0",
     "dat-encoding": "^4.0.2",
     "dat-node": "^3.5.3",
-    "debug": "^3.0.1",
+    "debug": "^3.1.0",
     "deep-equal": "^1.0.1",
     "glob": "^7.1.2",
     "minimist": "^1.2.0",
-    "neat-log": "^1.1.1",
+    "neat-log": "^1.1.2",
     "prettier-bytes": "^1.0.4",
     "xtend": "^4.0.1"
   }

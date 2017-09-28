@@ -4,64 +4,61 @@ var path      = require('path')
 var fs        = require('fs')
 var args      = require('minimist')(process.argv.slice(2))
 var neatlog   = require('neat-log')
-var output    = require('neat-log/output')
 var Dat       = require('dat-node')
 var stringKey = require('dat-encoding').toStr
 var xtend     = require('xtend')
-var chokidar  = require('chokidar')
 var glob      = require('glob')
 
-var defaultOpts = {
-  showKey: true,
-  createIfMissing: false,
-  exit: false,
-  port: 3282,
-  utp: true,
-  quiet: false,
-  watch: !!args.watch,
-  import: false
-}
-
-if (args.curses) {
-  var ui = require('./ui-blessed')
-  var neat = neatlog(ui.ui, {})
-  neat.use(ui.handler)
-}
-else {
-  var ui = require('./ui')
-  var neat = neatlog(ui, {})
-}
-
 if (args.help) {
-  var help = `Usage: dat-share-all [--watch] [--import] [--dir=<dir>]
+  var help = `Usage: dat-share-all [options] [--dir=<dir>]
 
 Share all dats that are located below a directory.
 
 Options:
-    --watch     Watch for new dats being added and share them(default: false).
-    --import    Watch for file changes in dats and import them (default: false).
-    --dir=<dir> Set the dir from which to look for dats (default: current dir).
-    --curses    Curses-style UI (WIP)
+    --import     Import file changes in writable dats (default: false).
+    --watch      Watch for file changes in writable dats and import (default: false).
+    --watchdir   Watch for new dats being added and share them (default: false).
+    --dir=<dir>  Set the dir from which to look for dats (default: current dir).
+    --port       Set port (default: 3282)
+    --neat       Simple list UI (WIP, not working correctly for many dats).
 `
   console.log(help)
   process.exit(0)
 }
 
-if (args.import) {
-  defaultOpts.import = true
+var defaultOpts = {
+  showKey: true,
+  createIfMissing: false,
+  exit: false,
+  port: args.port || 3282,
+  utp: true,
+  quiet: false,
+  watch: !!args.watch,
+  import: !!args.import
+}
+
+var ui, neat
+if (args.neat) {
+  ui = require('./ui-neat')
+  neat = neatlog(ui, {})
+}
+else {
+  ui = require('./ui-blessed')
+  neat = neatlog(ui, {})
 }
 
 neat.use(init)
 neat.use(archive)
 neat.use(wait)
-neat.render()
 
-if (args.watch) {
-  defaultOpts.watch = true
+if (args.watchdir) {
+  var chokidar  = require('chokidar')
   setInterval(function() {
-    neat.use(watch)
+    neat.use(watchdir)
   }, 5000)
 }
+
+neat.render()
 
 function init(state, bus) {
   state.dats = {}
@@ -71,17 +68,22 @@ function init(state, bus) {
   state.paths = []
   state.basepath = path.resolve(args.dir || process.cwd())
 
-  var globOpts = {absolute: true, cwd: state.basepath}
-  glob("**/.dat", globOpts, function(err, paths) {
-    if (err || !paths) return
-    paths.forEach(function(datpath) {
-      var parent = path.dirname(datpath)
-      if (state.paths.indexOf(datpath) === -1 && fs.lstatSync(datpath).isDirectory()) {
-        state.paths.push(datpath)
-        bus.emit('datpath', parent)
-      }
+  var globOpts = {absolute: true, cwd: state.basepath, strict: false, silent: true}
+  try {
+    glob("**/.dat", globOpts, function(err, paths) {
+      if (err || !paths) return
+      paths.forEach(function(datpath) {
+        var parent = path.dirname(datpath)
+        if (state.paths.indexOf(datpath) === -1 && fs.lstatSync(datpath).isDirectory()) {
+          state.paths.push(datpath)
+          bus.emit('datpath', parent)
+        }
+      })
     })
-  })
+  }
+  catch(e) {
+    // Todo: Error handling.
+  }
 
   bus.on('datpath', function(datpath) {
     var name = path.basename(datpath)
@@ -121,7 +123,7 @@ function init(state, bus) {
   })
 }
 
-function watch(state, bus) {
+function watchdir(state, bus) {
   var watcher = chokidar.watch(state.basepath + '/**/.dat')
   watcher.on('addDir', function(datpath) {
     if (state.paths.indexOf(datpath) === -1 && fs.lstatSync(datpath).isDirectory()) {
@@ -142,27 +144,34 @@ function wait (state, bus) {
 }
 
 function archive (state, bus) {
-  bus.on('dat', function (datState) {
-    fs.readFile(path.join(datState.path, 'dat.json'), function (err, data) {
-      if (err) datState.title = false
+  function setTitle(key) {
+    fs.readFile(path.join(state.dats[key].path, 'dat.json'), function (err, data) {
+      if (err) state.dats[key].title = ''
       try {
         var datJson = JSON.parse(data)
         if (datJson.title) {
-          datState.title = datJson.title
-          bus.render()
+          state.dats[key].title = datJson.title
         }
       }
       catch (e) {}
     })
-
+  }
+  bus.on('dat', function (datState) {
     var dat = datState.dat
     var key = datState.key
+    setTitle(key)
     var network = dat.joinNetwork(datState.opts, function () {
 
     })
     state.dats[key].sources = state.dats[key].sources || {}
+    bus.render()
     network.on('connection', function (conn, info) {
       // todo: connection details.
+    })
+    dat.archive.on('update', function() {
+      state.dats[key].updated = true
+      setTitle(key)
+      bus.render()
     })
   })
 }
