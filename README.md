@@ -1,24 +1,32 @@
 # dat-share-all
 
-> npm install -g dat-share-all
+    npm install -g dat-share-all
 
-Share all dats that are below a directory. Useful if developing with multiple dats.
+At some folder with multiple dats inside:
+
+    dat-share-all --import --watch
+
+Share all dats that are below a directory. Either just share the current state, or watch for file changes and auto-import. Has a curses-style UI to list shared dats and network connections.
 
 The official [dat-cli](https://github.com/dat/dat) shares a single dat (by default the path from where called). With `dat-share-all` you share all dats that are located below a directory.
 
 ## Installation
 
-> npm install -g dat-share-all
+    npm install -g dat-share-all
 
 ## Usage
 
-From a folder that has dats below it:
+    Usage: dat-share-all [options] [--dir=<dir>]
+    
+    Share all dats that are located below a directory.
+    
+    Options:
+        --import     Import file changes in writable dats (default: false).
+        --watch      Watch for file changes in writable dats and import (default: false).
+        --watchdir   Watch for new dats being added and share them (default: false).
+        --dir=<dir>  Set the dir from which to look for dats (default: current dir).
+        --port       Set port (default: 3282)
+        --neat       Simple list UI (WIP, not working correctly for many dats).
+    
 
-> dat-share-all
 
-Options:
-
-* `--watch`: Watch for new dats being created and automatically share them too (default: false)
-* `--import`: Watch for file changes and import and share them (default: false)
-* `--dir`: Set basedir from where to look for dats (default: current dir)
-* `--curses`: Use a curses-style UI (based on [blessed](https://github.com/chjj/blessed))

@@ -1,6 +1,6 @@
 {
   "name": "dat-share-all",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Share all dats in a folder",
   "main": "index.js",
   "scripts": {
